@@ -6,7 +6,8 @@ import hardhatUpgrades from "@openzeppelin/hardhat-upgrades";
 
 const sepoliaUrl = process.env.SEPOLIA_URL;
 const privateKey = process.env.PRIVATE_KEY;
-const bidderPrivateKey = process.env.BIDDER_PRIVATE_KEY;
+const bidderPrivateKey1 = process.env.BIDDER_PRIVATE_KEY1;
+const bidderPrivateKey2 = process.env.BIDDER_PRIVATE_KEY2;
 
 if (!sepoliaUrl) {
   throw new Error("Missing SEPOLIA_URL in .env");
@@ -38,7 +39,7 @@ export default defineConfig({
       type: "http",
       chainType: "l1",
       url: process.env.SEPOLIA_URL,
-      accounts: [privateKey,bidderPrivateKey],
+      accounts: [privateKey,bidderPrivateKey1,bidderPrivateKey2],
       chainId: 11155111,
     },
   },

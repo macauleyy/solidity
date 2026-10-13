@@ -9,7 +9,7 @@ async function main() {
   const Auction = await ethers.getContractFactory("Auctions");
   const auction = await upgradesApi.deployProxy(
     Auction,
-    [process.env.OWNER_ADDRESS, 250n],
+    [process.env.OWNER_ADDRESS, process.env.ETH_USD_FEED_ADDRESS],
     { kind: "uups" }
   );
 

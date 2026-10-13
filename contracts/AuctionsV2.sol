@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-// import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import {ReentrancyGuardTransient}
@@ -14,6 +13,11 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from
     "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import {AggregatorV3Interface}
+    from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+
+
 contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,ReentrancyGuardTransient{
     mapping(uint256 => mapping(address => uint256)) public pendingReturns;
     uint256 public platformFee;
@@ -22,23 +26,42 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
 
     IERC20 public paymentToken;
 
-    function initialize(address tokenAddress, uint256 initialValue)
-        public
-        initializer
+    AggregatorV3Interface public ethUsdFeed;
+    uint256 public maxPriceAge;
+
+    function initialize(
+        address initialOwner,
+        address feedAddress
+    ) public initializer {
+        __Ownable_init(initialOwner);
+
+        require(feedAddress != address(0), "Invalid feed");
+        ethUsdFeed = AggregatorV3Interface(feedAddress);
+
+        // 示例值；应根据所用 Feed 的 heartbeat 设置
+        maxPriceAge = 1 days;
+    }
+
+    function getLatestEthUsdPrice()
+        external
+        view
+        returns (int256 price, uint8 feedDecimals, uint256 updatedAt)
     {
-        __Ownable_init(msg.sender);
-        paymentToken = IERC20(tokenAddress);
-        platformFee = initialValue;
+        (
+            ,
+            price,
+            ,
+            updatedAt,
 
+        ) = ethUsdFeed.latestRoundData();
+
+        require(price > 0, "Invalid price");
+        require(updatedAt > 0 && updatedAt <= block.timestamp, "Invalid timestamp");
+        require(block.timestamp - updatedAt <= maxPriceAge, "Stale price");
+
+        feedDecimals = ethUsdFeed.decimals();
     }
 
-    function testUpdate(uint256 num) public {
-        value -= num;
-    }
-
-    function setValue(uint256 newValue) external onlyOwner {
-        value = newValue;
-    }
 
     function _authorizeUpgrade(address)
         internal
@@ -59,7 +82,9 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
     mapping(uint256 => Listing) public listings;  // 挂单映射
     uint256 public listingCounter;                // 挂单计数器
 
+    // 拍卖结构体
     struct Auction {
+        address paymentToken;     // address(0) 表示 ETH
         address seller;           // 卖家地址
         address nftContract;      // NFT合约地址
         uint256 tokenId;          // Token ID
@@ -70,6 +95,7 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
         bool active;              // 是否激活
     }
 
+    // 创建拍卖
     event AuctionCreated(
         uint256 auctionCounter,
         address sender,
@@ -78,13 +104,15 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
         uint256 startPrice,
         uint256 endTime
     );
-
+    
+    // 出价
     event BidPlaced(
         uint256 auctionId, 
         address sender, 
         uint256 value
     );
 
+    // 拍卖结束
     event AuctionEnded(
         uint256 auctionId,
         address highestBidder,
@@ -103,34 +131,8 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
     // 下架
     event NFTDelisted(uint256 indexed listingId);
 
-    // 卖出
-    event NFTSold(
-        uint256 indexed listingId,
-        address indexed buyer,
-        address indexed seller,
-        uint256 price
-    );
-
     mapping(uint256 => Auction) public auctions;
     uint256 auctionCounter;
-    // _getRoyaltyInfo函数  检查NFT合约是否支持ERC2981标准
-    function _getRoyaltyInfo(
-        address nftContract,
-        uint256 tokenId,
-        uint256 salePrice
-    ) internal view returns (address receiver, uint256 royaltyAmount) {
-        // 检查NFT合约是否支持ERC2981
-        if (IERC165(nftContract).supportsInterface(type(IERC2981).interfaceId)) {
-            (receiver, royaltyAmount) = IERC2981(nftContract).royaltyInfo(
-                tokenId,
-                salePrice
-            );
-        } else {
-            // 不支持版税，返回零地址和零金额
-            receiver = address(0);
-            royaltyAmount = 0;
-        }
-    }
 
      //  上架功能
     function listNFT(
@@ -180,47 +182,13 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
         emit NFTDelisted(listingId);
     }
 
-
-    // buyNFT 功能
-    function buyNFT(uint256 listingId) external payable nonReentrant {
-        Listing storage listing = listings[listingId];
-        require(listing.active, "Listing not active");
-        require(msg.value >= listing.price, "Insufficient payment");
-        require(msg.sender != listing.seller, "Cannot buy your own NFT");
-        
-        listing.active = false;
-        
-        uint256 fee = (listing.price * platformFee) / 10000;
-        uint256 sellerAmount = listing.price - fee;
-        
-        IERC721(listing.nftContract).safeTransferFrom(
-            listing.seller,
-            msg.sender,
-            listing.tokenId
-        );
-        
-        (bool successSeller, ) = listing.seller.call{value: sellerAmount}("");
-        require(successSeller, "Transfer to seller failed");
-        
-        (bool successFee, ) = feeRecipient.call{value: fee}("");
-        require(successFee, "Transfer fee failed");
-        
-        if (msg.value > listing.price) {
-            (bool successRefund, ) = msg.sender.call{
-                value: msg.value - listing.price
-            }("");
-            require(successRefund, "Refund failed");
-        }
-        
-        emit NFTSold(listingId, msg.sender, listing.seller, listing.price);
-    }
     
 
     // 创建拍卖
     function createAuction(
         address nftContract,
         uint256 tokenId,
-        uint256 startPrice,
+        uint256 startPriceUsd18,
         uint256 durationHours
     ) external returns (uint256) {
         require(startPrice > 0, "Start price must be greater than 0");
@@ -238,10 +206,10 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
             seller: msg.sender,
             nftContract: nftContract,
             tokenId: tokenId,
-            startPrice: startPrice,
+            startPrice: startPriceUsd18,
             highestBid: 0,
             highestBidder: address(0),
-            endTime: block.timestamp + (durationHours * 1 hours),
+            endTime: block.timestamp + (durationHours * 1 minutes),
             active: true
         });
         
@@ -263,8 +231,22 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
         require(auction.active, "Auction not active");
         require(block.timestamp < auction.endTime, "Auction ended");
         require(msg.sender != auction.seller, "Seller cannot bid");
-        
+    
         uint256 minBid;
+
+        if (auction.paymentToken == address(0)) {
+            // ETH 出价：amount 和实际转入金额必须一致
+            require(msg.value == amount, "ETH amount mismatch");
+        } else {
+            // ERC-20 出价：不能同时附带 ETH
+            require(msg.value == 0, "Do not send ETH");
+            IERC20(auction.paymentToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                amount
+            );
+        }
+
         if (auction.highestBid == 0) {
             minBid = auction.startPrice;
         } else {
@@ -279,10 +261,10 @@ contract AuctionsV2 is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reentra
         }
         
         // 更新最高出价
-        auction.highestBid = amount;
+        auction.highestBid = msg.value;
         auction.highestBidder = msg.sender;
         
-        emit BidPlaced(auctionId, msg.sender, amount);
+        emit BidPlaced(auctionId, msg.sender, msg.value);
     }
 
 
