@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 // import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -16,6 +17,7 @@ import {UUPSUpgradeable} from
     "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract Auctions is Initializable, OwnableUpgradeable,UUPSUpgradeable,ReentrancyGuardTransient{
+    using SafeERC20 for IERC20;
     mapping(uint256 => mapping(address => uint256)) public pendingReturns;
     uint256 public platformFee;
     address public feeRecipient;        // 手续费接收地址
