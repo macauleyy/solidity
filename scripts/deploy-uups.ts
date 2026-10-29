@@ -6,10 +6,10 @@ async function main() {
   const { ethers } = connection;
   const upgradesApi = await upgrades(hre, connection);
 
-  const Auction = await ethers.getContractFactory("AuctionsV2");
+  const Auction = await ethers.getContractFactory("Auctions");
   const auction = await upgradesApi.deployProxy(
     Auction,
-    [process.env.OWNER_ADDRESS, process.env.ETH_USD_FEED_ADDRESS],
+    [process.env.OWNER_ADDRESS, 250,process.env.OWNER_ADDRESS,process.env.ETH_USD_FEED_ADDRESS],
     { kind: "uups" }
   );
 

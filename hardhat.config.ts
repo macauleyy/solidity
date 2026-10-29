@@ -9,17 +9,7 @@ const privateKey = process.env.PRIVATE_KEY;
 const bidderPrivateKey1 = process.env.BIDDER_PRIVATE_KEY1;
 const bidderPrivateKey2 = process.env.BIDDER_PRIVATE_KEY2;
 
-if (!sepoliaUrl) {
-  throw new Error("Missing SEPOLIA_URL in .env");
-}
 
-if (!privateKey) {
-  throw new Error("Missing PRIVATE_KEY in .env");
-}
-
-// if (!privateKey) {
-//   throw new Error("Missing PRIVATE_KEY in .env");
-// }
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthers, hardhatUpgrades],
 
@@ -27,6 +17,11 @@ export default defineConfig({
     version: "0.8.34",
     settings: {
       evmVersion: "cancun",
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+      viaIR: true,
     },
   },
 
@@ -35,13 +30,15 @@ export default defineConfig({
       type: "edr-simulated",
       chainId: 31337,
     },
-    sepolia: {
+    ...(sepoliaUrl ? { sepolia: {
       type: "http",
       chainType: "l1",
-      url: process.env.SEPOLIA_URL,
-      accounts: [privateKey,bidderPrivateKey1,bidderPrivateKey2],
+      url: sepoliaUrl,
+      accounts: [privateKey, bidderPrivateKey1, bidderPrivateKey2].filter(
+        (key): key is string => Boolean(key),
+      ),
       chainId: 11155111,
-    },
+    } } : {}),
   },
 
   verify: {
