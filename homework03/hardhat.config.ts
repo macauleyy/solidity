@@ -25,6 +25,18 @@ export default defineConfig({
     },
   },
 
+  coverage: {
+    skipFiles: [
+      "contracts/AuctionsTest.sol",
+      "contracts/Counter.sol",
+      "contracts/Counter.t.sol",
+      "contracts/ERC20.sol",
+      "contracts/MockV3Aggregator.sol",
+      "contracts/MyNFT.sol",
+      "contracts/RoyaltyNFT.sol",
+    ],
+  },
+
   networks: {
     hardhat: {
       type: "edr-simulated",

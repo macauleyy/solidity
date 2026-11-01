@@ -1,0 +1,8 @@
+{
+  "name": "solidity-practice-exercises",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "hardhat": "^3.18.1"
+  }
+}

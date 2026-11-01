@@ -1,4 +1,4 @@
-// import { getNft, getAuction } from "./helpers.js";
+// 此脚本直接连接已部署合约，暂不使用 helpers.ts 中的辅助函数
 import { network } from "hardhat";
 
 async function main() {
@@ -37,7 +37,7 @@ async function main() {
                 break;
             }
         } catch {
-            // 忽略不属于 NFT 合约的日志
+            // 非 NFTMinted 事件的日志不参与解析
         }
     }
     if (tokenId === undefined) {
@@ -46,10 +46,9 @@ async function main() {
     console.log("铸造的 tokenId:", tokenId.toString());
 
     
-    // NFT上架，上架前需先授权
+    // 上架 NFT 前，先授权拍卖合约转移该 NFT
     console.log("---------2、NFT上架---------");
-    // const tokenId = tx;
-    // const erc20Token = process.env.TestToken_ADDRESS;
+    // 如需使用 ERC-20，可在此读取对应代币地址并配置支付代币
     const paymentToken = "0x0000000000000000000000000000000000000000";
 
     const nftAddress = await nft.getAddress();
@@ -79,7 +78,7 @@ async function main() {
                 break;
             }
         } catch {
-            // 忽略不属于 NFT 合约的日志
+            // 非 NFTListed 事件的日志不参与解析
         }
     }
 
@@ -105,12 +104,12 @@ async function main() {
             const parsed = auction.interface.parseLog(log);
 
             if (parsed?.name === "AuctionCreated") {
-                // 假设事件参数顺序是 address, uint256, string
+                // AuctionCreated 的第一个参数是拍卖 ID
                 auctionCounter = parsed.args[0];
                 break;
             }
         } catch {
-            // 忽略不属于 NFT 合约的日志
+            // 非 AuctionCreated 事件的日志不参与解析
         }
     }
 
@@ -119,7 +118,7 @@ async function main() {
     }
     console.log("创建拍卖成功，拍卖ID为：",auctionCounter);
     
-    //  出价
+    // 两个出价账户依次提交 ETH 出价
     console.log("---------4、出价---------");
     
     const auction1 = await ethers.getContractAt("Auctions", address1, signer[1]);
@@ -133,7 +132,7 @@ async function main() {
     console.log("用户2出价成功");
 
 
-    // 结束拍卖
+    // 拍卖结束后结算
     console.log("---------5、结束拍卖---------");
 
     const end = await auction.endAuction(auctionCounter);
@@ -142,7 +141,7 @@ async function main() {
     const newOwner = nft.ownerOf(tokenId);
     console.log("The new owner is:",auctionCounter);
 
-    // 退款
+    // 第一位出价者被超出后，可提取其退款
     await auction1.withdrawBid(auctionCounter);
     console.log("用户1提现完成");
 

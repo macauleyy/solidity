@@ -14,7 +14,7 @@ describe("Counter", function () {
     const counter = await ethers.deployContract("Counter");
     const deploymentBlockNumber = await ethers.provider.getBlockNumber();
 
-    // run a series of increments
+    // 连续执行多次递增操作
     for (let i = 1; i <= 10; i++) {
       await counter.incBy(i);
     }
@@ -25,7 +25,7 @@ describe("Counter", function () {
       "latest",
     );
 
-    // check that the aggregated events match the current value
+    // 汇总事件中的递增量，并与合约当前值进行核对
     let total = 0n;
     for (const event of events) {
       total += event.args.by;

@@ -4,13 +4,11 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-// import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import {ReentrancyGuardTransient}
     from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
-// pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from
@@ -20,7 +18,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
     using SafeERC20 for IERC20;
     mapping(uint256 => mapping(address => uint256)) public pendingReturns;
     uint256 public platformFee;
-    address public feeRecipient;        // 手续费接收地址
+    address public feeRecipient;        // 平台手续费接收地址
     uint256 public value;
 
     IERC20 public paymentToken;
@@ -55,24 +53,24 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
 
     struct Listing {
         address seller;        // 卖家地址
-        address nftContract;   // NFT合约地址
-        uint256 tokenId;       // Token ID
-        uint256 price;         // 售价（wei）
-        bool active;           // 是否激活
+        address nftContract;   // NFT 合约地址
+        uint256 tokenId;       // NFT 的 tokenId
+        uint256 price;         // 以 wei 表示的售价
+        bool active;           // 挂单是否有效
     }
 
-    mapping(uint256 => Listing) public listings;  // 挂单映射
-    uint256 public listingCounter;                // 挂单计数器
+    mapping(uint256 => Listing) public listings;  // 挂单 ID 到挂单信息的映射
+    uint256 public listingCounter;                // 已分配的挂单 ID 数量
 
     struct Auction {
         address seller;           // 卖家地址
-        address nftContract;      // NFT合约地址
-        uint256 tokenId;          // Token ID
-        uint256 startPrice;       // 起拍价
+        address nftContract;      // NFT 合约地址
+        uint256 tokenId;          // NFT 的 tokenId
+        uint256 startPrice;       // 以 wei 表示的起拍价
         uint256 highestBid;       // 当前最高出价
         address highestBidder;    // 当前最高出价者
-        uint256 endTime;          // 拍卖结束时间
-        bool active;              // 是否激活
+        uint256 endTime;          // 拍卖结束时间戳
+        bool active;              // 拍卖是否仍有效
     }
 
     event AuctionCreated(
@@ -96,7 +94,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
         uint256 highestBid
     );
 
-    // 上架
+    // NFT 上架事件
     event NFTListed(
         uint256 indexed listingId,
         address indexed seller,
@@ -105,10 +103,10 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
         uint256 price
     );
 
-    // 下架
+    // NFT 下架事件
     event NFTDelisted(uint256 indexed listingId);
 
-    // 卖出
+    // NFT 售出事件
     event NFTSold(
         uint256 indexed listingId,
         address indexed buyer,
@@ -119,26 +117,26 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
     mapping(uint256 => Auction) public auctions;
     uint256 auctionCounter;
     
-    // _getRoyaltyInfo函数  检查NFT合约是否支持ERC2981标准
+    // 查询 NFT 的 ERC-2981 版税信息
     function _getRoyaltyInfo(
         address nftContract,
         uint256 tokenId,
         uint256 salePrice
     ) internal view returns (address receiver, uint256 royaltyAmount) {
-        // 检查NFT合约是否支持ERC2981
+        // 检查 NFT 合约是否支持 ERC-2981 标准
         if (IERC165(nftContract).supportsInterface(type(IERC2981).interfaceId)) {
             (receiver, royaltyAmount) = IERC2981(nftContract).royaltyInfo(
                 tokenId,
                 salePrice
             );
         } else {
-            // 不支持版税，返回零地址和零金额
+            // 不支持版税时，返回零地址和零金额
             receiver = address(0);
             royaltyAmount = 0;
         }
     }
 
-     //  上架功能
+    // 创建 NFT 挂单
     function listNFT(
         address nftContract,
         uint256 tokenId,
@@ -174,7 +172,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
         return listingCounter;
     }
 
-    //  下架功能
+    // 卖家撤销 NFT 挂单
     function delistNFT(uint256 listingId) external {
         Listing storage listing = listings[listingId];
         
@@ -187,7 +185,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
     }
 
 
-    // buyNFT 功能
+    // 买家支付 ETH 购买 NFT
     function buyNFT(uint256 listingId) external payable nonReentrant {
         Listing storage listing = listings[listingId];
         require(listing.active, "Listing not active");
@@ -222,7 +220,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
     }
     
 
-    // 创建拍卖
+    // 创建 NFT 拍卖
     function createAuction(
         address nftContract,
         uint256 tokenId,
@@ -263,7 +261,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
         return auctionCounter;
     }
 
-    // placeBid 出价函数
+    // 提交 ETH 出价
     function placeBid(uint256 auctionId) external payable {
         Auction storage auction = auctions[auctionId];
         require(auction.active, "Auction not active");
@@ -274,17 +272,17 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
         if (auction.highestBid == 0) {
             minBid = auction.startPrice;
         } else {
-            minBid = auction.highestBid + (auction.highestBid * 5 / 100); // 5% increment
+            minBid = auction.highestBid + (auction.highestBid * 5 / 100); // 最低加价幅度为 5%
         }
         
         require(msg.value >= minBid, "Bid too low");
         
-        // 如果有之前的出价者，记录他们的待退款金额
+        // 将上一位最高出价者的资金记入可提取退款
         if (auction.highestBidder != address(0)) {
             pendingReturns[auctionId][auction.highestBidder] += auction.highestBid;
         }
         
-        // 更新最高出价
+        // 更新最高出价及出价者
         auction.highestBid = msg.value;
         auction.highestBidder = msg.sender;
         
@@ -292,7 +290,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
     }
 
 
-    // 退款函数
+    // 出价者提取先前被超出的出价
     function withdrawBid(uint256 auctionId) external {
         uint256 amount = pendingReturns[auctionId][msg.sender];
         require(amount > 0, "No pending return");
@@ -304,7 +302,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
     }
 
 
-    // 结束拍卖
+    // 拍卖到期后结算最高出价，或在无人出价时结束拍卖
     function endAuction(uint256 auctionId) external nonReentrant {
         Auction storage auction = auctions[auctionId];
         
@@ -314,7 +312,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
         auction.active = false;
         
         if (auction.highestBidder != address(0)) {
-            // 有人出价，进行结算
+            // 存在有效出价，执行成交结算
             uint256 fee = (auction.highestBid * platformFee) / 10000;
             
             (address royaltyReceiver, uint256 royaltyAmount) = _getRoyaltyInfo(
@@ -325,14 +323,14 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
             
             uint256 sellerAmount = auction.highestBid - fee - royaltyAmount;
             
-            // 转移NFT
+            // 将 NFT 转给最高出价者
             IERC721(auction.nftContract).safeTransferFrom(
                 auction.seller,
                 auction.highestBidder,
                 auction.tokenId
             );
             
-            // 资金分配
+            // 按版税、卖家收入和平台手续费分配资金
             if (royaltyAmount > 0 && royaltyReceiver != address(0)) {
                 (bool successRoyalty, ) = royaltyReceiver.call{value: royaltyAmount}("");
                 require(successRoyalty, "Royalty transfer failed");
@@ -350,7 +348,7 @@ contract AuctionsTest is Initializable, OwnableUpgradeable,UUPSUpgradeable,Reent
                 auction.highestBid
             );
         } else {
-            // 没有人出价，拍卖流拍
+            // 无人出价，拍卖流拍
             emit AuctionEnded(auctionId, address(0), 0);
         }
     }

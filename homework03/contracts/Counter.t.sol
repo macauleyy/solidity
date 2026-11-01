@@ -4,8 +4,7 @@ pragma solidity ^0.8.34;
 import {Counter} from "./Counter.sol";
 import {Test} from "forge-std/Test.sol";
 
-// Solidity tests are compatible with foundry, so they
-// use the same syntax and offer the same functionality.
+// Solidity 测试兼容 Foundry，可使用相同的语法和功能
 
 contract CounterTest is Test {
   Counter counter;

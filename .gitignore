@@ -1,31 +1,21 @@
-# Node modules
-/node_modules
+# 依赖目录
+**/node_modules/
 
-# Compilation output
-/dist
+# 编译产物和构建目录
+**/dist/
+**/bundle/
+**/artifacts/
+**/cache/
+**/types/
+**/coverage/
 
-# pnpm deploy output
-/bundle
+# 本地环境变量文件
+**/.env
+**/.env.*
+!**/.env.example
 
-# Hardhat Build Artifacts
-/artifacts
+# Gas 快照文件
+**/.gas-snapshot
 
-# Hardhat compilation (v2) support directory
-/cache
-
-# Typechain output
-/types
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Hardhat coverage reports
-/coverage
-
-# Gas snapshot files
-/.gas-snapshot
-
-# Snapshot cheatcodes output
-/snapshots
+# 测试快照目录
+**/snapshots/
